@@ -1,10 +1,11 @@
 let axios = require('axios');
 let https = require('https');
 let urllib = require('url');
+let fs = require('fs');
 let cheerio = require('cheerio');
 let {fsWrite,fsRead,fsDir} = require('./lcfs')
 // let request = require('request')
-
+{/* <script src="http://css99tel.cdndm5.com/v201910292122/blue/js/chapternew_v22.js" type="text/javascript"></script>e */}
 let httpUrl = "http://www.1kkk.com/manhua-list/";
 let hostUrl = "http://www.1kkk.com/"
 // console.log(axios);
