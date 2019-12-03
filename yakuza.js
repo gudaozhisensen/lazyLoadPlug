@@ -1,18 +1,48 @@
 let axios = require('axios');
 let urllib = require('url');
 let cheerio = require('cheerio');
-const fs = require('fs')
-let {fsWrite,fsRead,fsDir} = require('./lcfs')
+const fs = require('fs');
+let puppeteer = require('puppeteer');
+// let {fsWrite,fsRead,fsDir} = require('./lcfs');
+
+let debugOptions = {
+    //设置视窗的宽高
+    defaultViewport:{
+        width:1400,
+        height:800
+    },
+    //设置为有界面，如果为true，即为无界面
+    headless:false,
+    //设置放慢每个步骤的毫秒数
+    slowMo:250,
+    timeout:0
+}
+let options={headless:true};
+
 
 let count = 1;
 let httpUrl = "http://www.1kkk.com/manhua40946/";
 let hostUrl = "http://www.1kkk.com/"
+let chapterList = [];
+
+//将延迟函数封装成promise对象
+function lcWait(milliSecondes){
+    return new Promise(function(resolve,reject){
+        setTimeout(function(){
+            resolve("成功执行延迟函数，延迟："+milliSecondes)
+        },milliSecondes)
+    })
+}
 
 async function getPageData() {
    let pageHtml =  await axios.get(httpUrl);
    $ = cheerio.load(pageHtml.data,{decodeEntities: false});
+   let browser = await puppeteer.launch(debugOptions);
    let tempc = $('a.block').each(async(item,i)=>{
-       let chapterList = await getChaptersList(item);
+    //    let chapterList = await getChaptersList(item);
+    // test 
+    getMhImages('http://www.1kkk.com/ch39-924334/#ipg2');
+
         // console.log(i.children[0].data);
         // chapterList = JSON.stringify(chapterList, null, 2);
         // console.log(chapterList);
@@ -22,25 +52,29 @@ async function getChaptersList(index){
     let pageHtml = await axios.get(httpUrl);
     $ = cheerio.load(pageHtml.data,{decodeEntities: false});
     
-    let chapterList = [];
     let arrUrl = [];
     //拿到连载和番外等列表的长度
     //根据列表分类循环拿到分类下的li数据 
     let num =1
     let length = $('.detail-list-select').eq(index).find('li a').length;
-
+    let page = await browser.newPage();      
+    await page.goto(httpUrl);
     $('.detail-list-select').eq(index).find('li a').each(async(item,i)=> {
-         
+        
         let chapterUrl = $(i).attr('href');
         chapterUrl = urllib.resolve(hostUrl,chapterUrl);
+          
         //获取text文本数据但不包括子元素的文本
+        //章节名
         let chapterNumber = $(i).children()[0].prev.data;
+        //获取总页数
         let totalPage = $(i).find('span').text();
+       
         
        
         // 获取每章的漫画页
-        let mhImages = await getMhImages(chapterUrl);
-        mhImages = JSON.stringify(mhImages, null, 2);
+        // let mhImages = await getMhImages(chapterUrl);
+        // mhImages = JSON.stringify(mhImages, null, 2);
         let obj ={
             url: chapterUrl,
             chapter:chapterNumber,
@@ -48,12 +82,12 @@ async function getChaptersList(index){
             // images:mhImages
         };
         
-       
         chapterList.push(obj);
         num++;
         
-
+        
         if(num==length){
+            page.close();
             return chapterList;
         }
         
@@ -65,33 +99,57 @@ async function getChaptersList(index){
 async function getMhImages(url){
     let pageHtml = await axios.get(url);
     $ = cheerio.load(pageHtml.data,{decodeEntities: false});
-    // 网站图片的匹配语句;
-    let reg = await axios.get('http://css99tel.cdndm5.com/v201910292122/blue/js/chapternew_v22.js');
-    console.log(reg);
-    // let reg = eval(function(p,a,c,k,e,d){e=function(c){return(c<a?"":e(parseInt(c/a)))+((c=c%a)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(c--)d[e(c)]=k[c]||e(c);k=[function(e){return d[e]}];e=function(){return'\\w+'};c=1;};while(c--)if(k[c])p=p.replace(new RegExp('\\b'+e(c)+'\\b','g'),k[c]);return p;}('n 5(){2 6=4;2 8=\'9\';2 7="o://l-m-r-s-p.q.k/c/a/4";2 3=["/b.1","/h.1","/f.1","/g.1","/j.1","/e.1","/t.1","/C.1","/D.1","/B.1","/E.1","/H.1","/F.1","/G.1","/w.1","/v.1","/u.1"];x(2 i=0;i<3.A;i++){3[i]=7+3[i]+\'?6=4&8=9&z=\'}y 3}2 d;d=5();',44,44,'|jpg|var|pvalue|924334|dm5imagefun|cid|pix|key|b01190031112f8ad59b981fc0de491e5|40946|2_9946|41||7_7881|4_5610|5_2428|3_6594||6_4891|com|manhua1033|61|function|http|98|cdndm5|174|50|8_9302|18_9454|17_5056|16_8579|for|return|uk|length|11_1409|9_6895|10_6442|12_1096|14_9080|15_7352|13_4637'.split('|'),0,{}))
-
-    let chapterImgList = [];
-     // 每一章的页码
-   let imgLength = $('.chapterpager').eq(0).find('a').last().text();
-//    console.log(imgLength);
-   let chapterUrl ='/ch39-924334-p'+count+'/';
-   chapterUrl = urllib.resolve(hostUrl,chapterUrl);
-   let chapterImgUrl = reg[count-2];
-   imagesName = 'ch39-924334-p'+count;
-   let obj ={
-       url: chapterUrl,
-       img:chapterImgUrl,
-       name:imagesName
-   };
-   chapterImgList.push(obj);
-   count++;
-    if(count == imgLength){
-        count = 0;
+    let page = await browser.newPage();
+    let reg = [];
+     // 网站图片请求的js语句;
+    await page.setRequestInterception(true);
+        //监听请求事件，并对请求进行拦截
+        page.on('request', interceptedRequest => {
+            //通过URL模块对请求的地址进行解析
+            let urlObj = urllib.parse(interceptedRequest.url());
+            if (urlObj.pathname.indexOf("galileo")!=-1){
+                //如果是广告请求，那么就放弃当次请求
+                interceptedRequest.abort();
+            }else if(urlObj.pathname.indexOf("chapterfun")!=-1){
+                reg.push(urlObj.href);
+                interceptedRequest.continue();
+            }else{
+                interceptedRequest.continue();
+            }
+            
+            
+        });
+    await page.goto(url);
+    await page.goto(reg[0]);
+    document.getElementsByTagName('pre')[0].innerText;//?
+    let pageDetalList = await page.$eval('pre',(element)=>{
+        let text = element.html();
+        console.log(element);
+    })
+    // page.close();
+    return pageDetalList;
+//     let chapterImgList = [];
+//      // 每一章的页码
+//    let imgLength = $('.chapterpager').eq(0).find('a').last().text();
+// //    console.log(imgLength);
+//    let chapterUrl ='/ch39-924334-p'+count+'/';
+//    chapterUrl = urllib.resolve(hostUrl,chapterUrl);
+//    let chapterImgUrl = reg[count-2];
+//    imagesName = 'ch39-924334-p'+count;
+//    let obj ={
+//        url: chapterUrl,
+//        img:chapterImgUrl,
+//        name:imagesName
+//    };
+//    chapterImgList.push(obj);
+//    count++;
+//     if(count == imgLength){
+//         count = 0;
         
-        // downLoad(chapterImgUrl,imagesName);
-        // console.log(chapterImgUrl);
-        // console.log(imagesName);
-       }
+//         // downLoad(chapterImgUrl,imagesName);
+//         // console.log(chapterImgUrl);
+//         // console.log(imagesName);
+//        }
         
    
     // return chapterImgList;
