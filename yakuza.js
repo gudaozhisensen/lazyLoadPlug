@@ -3,7 +3,7 @@ let urllib = require('url');
 let cheerio = require('cheerio');
 const fs = require('fs');
 let puppeteer = require('puppeteer');
-// let {fsWrite,fsRead,fsDir} = require('./lcfs');
+let {fsWrite,fsRead,fsDir} = require('./lcfs');
 
 let debugOptions = {
     //设置视窗的宽高
